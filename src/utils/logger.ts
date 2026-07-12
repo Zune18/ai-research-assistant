@@ -1,5 +1,6 @@
 import pino from "pino";
 import { env } from "../config/env";
+import type { LogContext } from "../types";
 
 const isDev = env.NODE_ENV === "development";
 
@@ -25,6 +26,6 @@ export const baseLogger = pino({
  *   const log = createLogger({ agent: "ScraperAgent", runId: "abc123" });
  *   log.info("Starting scrape");
  */
-export function createLogger(context: Record<string, unknown>) {
+export function createLogger(context: LogContext) {
   return baseLogger.child(context);
 }
