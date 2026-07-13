@@ -8,6 +8,9 @@ describe("parseEnv", () => {
             PORT: "4000",
             OPENROUTER_API_KEY: "test-key",
             DATABASE_URL: "postgresql://user:pass@localhost:5432/testdb",
+            REDIS_URL: "redis://localhost:6379",
+            PINECONE_API_KEY: "test-pinecone-key",
+            PINECONE_INDEX_NAME: "test-index",
         });
 
         expect(env.PORT).toBe(4000);
@@ -18,6 +21,9 @@ describe("parseEnv", () => {
         const env = parseEnv({
             OPENROUTER_API_KEY: "test-key",
             DATABASE_URL: "postgresql://user:pass@localhost:5432/testdb",
+            REDIS_URL: "redis://localhost:6379",
+            PINECONE_API_KEY: "test-pinecone-key",  
+            PINECONE_INDEX_NAME: "test-index",
         });
 
         expect(env.NODE_ENV).toBe("development");

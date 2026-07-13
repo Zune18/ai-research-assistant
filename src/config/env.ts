@@ -6,6 +6,9 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   OPENROUTER_API_KEY: z.string().min(1, "OPENROUTER_API_KEY is required"),
   DATABASE_URL: z.string().url().min(1, "DATABASE_URL is required"),
+  REDIS_URL: z.string().url().min(1, "REDIS_URL is required"),
+  PINECONE_API_KEY: z.string().min(1, "PINECONE_API_KEY is required"),
+  PINECONE_INDEX_NAME: z.string().min(1).default("research-platform"),
 });
 
 export type Env = z.infer<typeof envSchema>;
