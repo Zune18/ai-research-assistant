@@ -4,6 +4,10 @@ services:
     command: node dist/index.js
     ports:
       - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://research:research@postgres:5432/research_platform
+      - REDIS_URL=redis://redis:6379
     env_file:
       - .env
     depends_on:
@@ -14,7 +18,11 @@ services:
 
   app-worker:
     build: .
-    command: node dist/index.js
+    command: node dist/queue/worker-entrypoint.js
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://research:research@postgres:5432/research_platform
+      - REDIS_URL=redis://redis:6379
     env_file:
       - .env
     depends_on:

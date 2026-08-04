@@ -9,7 +9,8 @@
     "dev": "tsc --watch",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "worker": "node dist/queue/worker-entrypoint.js"
   },
   "keywords": [],
   "author": "",

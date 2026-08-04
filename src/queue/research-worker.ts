@@ -20,12 +20,19 @@ export function buildResearchWorker() {
       const { runId, topic } = job.data;
       log.info({ runId, topic }, "Processing research job");
 
+      await job.updateProgress({ percent: 0, stage: "starting" });
+
       const graph = buildDemoGraph();
       const config = { configurable: { thread_id: runId } };
 
       try {
+        await job.updateProgress({ percent: 50, stage: "running graph" });
+
         const result = await graph.invoke({}, config);
+
+        await job.updateProgress({ percent: 100, stage: "completed" });
         await db.update(runs).set({ status: "completed", updatedAt: new Date() }).where(eq(runs.id, runId));
+
         return result;
       } catch (err) {
         await db.update(runs).set({ status: "failed", updatedAt: new Date() }).where(eq(runs.id, runId));
@@ -33,6 +40,6 @@ export function buildResearchWorker() {
         throw err;
       }
     },
-    { connection }
+    { connection, concurrency: 5 }
   );
 }
