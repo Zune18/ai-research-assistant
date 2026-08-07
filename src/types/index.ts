@@ -24,3 +24,9 @@ export interface LogContext {
   runId?: RunId;
   [key: string]: unknown; // allows extra fields without breaking callers
 }
+
+export interface BrowserAgentResult {
+  url: string;
+  title: string;
+  screenshotPath?: string;
+}
