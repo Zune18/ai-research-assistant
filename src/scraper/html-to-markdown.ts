@@ -22,6 +22,15 @@ export interface ScrapedContent {
   title: string;
   markdown: string;
   excerpt: string;
+  author: string | null;
+  publishedAt: string | null;
+  canonicalUrl: string | null;
+  siteName: string | null;
+}
+
+function extractMetaContent(document: Document, selector: string): string | null {
+  const el = document.querySelector(selector);
+  return el?.getAttribute("content") ?? null;
 }
 
 /**
@@ -30,7 +39,9 @@ export interface ScrapedContent {
  */
 export function htmlToMarkdown(rawHtml: string, url: string): ScrapedContent {
   const dom = new JSDOM(rawHtml, { url });
-  const reader = new Readability(dom.window.document);
+  const document = dom.window.document;
+
+  const reader = new Readability(document);
   const article = reader.parse();
 
   if (!article || !article.content) {
@@ -40,11 +51,27 @@ export function htmlToMarkdown(rawHtml: string, url: string): ScrapedContent {
 
   const markdown = turndownService.turndown(article.content);
 
+  // Fall back through common meta tag conventions, since sites vary widely
+  const publishedAt =
+    extractMetaContent(document, 'meta[property="article:published_time"]') ??
+    extractMetaContent(document, 'meta[name="date"]');
+
+  const author =
+    article.byline ??
+    extractMetaContent(document, 'meta[name="author"]');
+
+  const canonicalUrl =
+    document.querySelector('link[rel="canonical"]')?.getAttribute("href") ?? url;
+
   log.info({ url, title: article.title, length: markdown.length }, "Converted HTML to markdown");
 
   return {
     title: article.title ?? "",
     markdown,
     excerpt: article.excerpt ?? "",
+    author,
+    publishedAt,
+    canonicalUrl,
+    siteName: article.siteName ?? null,
   };
 }

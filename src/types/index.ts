@@ -29,4 +29,5 @@ export interface BrowserAgentResult {
   url: string;
   title: string;
   screenshotPath?: string;
+  html: string;
 }

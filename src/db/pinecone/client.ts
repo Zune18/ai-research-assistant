@@ -3,7 +3,7 @@ import { env } from "../../config/env";
 
 export const pinecone = new Pinecone({ apiKey: env.PINECONE_API_KEY });
 
-const EMBEDDING_DIMENSION = 1536;
+const EMBEDDING_DIMENSION = 2048;
 
 // Ensures the index exists, creating it only if missing.
 export async function ensureIndexExists(): Promise<void> {

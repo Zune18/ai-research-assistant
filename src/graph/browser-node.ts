@@ -29,12 +29,13 @@ async function browserNode(state: typeof BrowserAgentState.State) {
     await controller.waitForSelector(page, "body");
 
     const title = await page.title();
+    const html = await page.content();
     const screenshotPath = await controller.screenshot(
       page,
       `browser-node-${Date.now()}.png`
     );
 
-    return { url: state.targetUrl, title, screenshotPath };
+    return { url: state.targetUrl, title, screenshotPath, html };
   });
 
   return { result };
