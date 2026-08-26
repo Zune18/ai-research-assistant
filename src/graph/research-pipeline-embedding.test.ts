@@ -10,10 +10,9 @@ describe("Research pipeline: full chain through embedding", () => {
     const runId = randomUUID();
 
     const result = await graph.invoke(
-      { targetUrl: "https://example.com", runId },
+      { targetUrl: "https://example.com", runId, query: "test query" },
       { configurable: { thread_id: threadId } }
     );
-
     expect(result.chunksUpserted).toBeGreaterThan(0);
 
     await new Promise((resolve) => setTimeout(resolve, 2000));

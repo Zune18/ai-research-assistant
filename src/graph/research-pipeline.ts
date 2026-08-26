@@ -5,19 +5,24 @@ import { htmlToMarkdown, ScrapedContent } from "../scraper/html-to-markdown";
 import { chunkText } from "../embeddings/chunk";
 import { embedChunks } from "../embeddings/embed-chunks";
 import { upsertChunks } from "../embeddings/upsert";
+import { semanticSearch } from "../retrieval/search";
+import { buildContext, BuiltContext } from "../retrieval/build-context";
 import { createLogger } from "../utils/logger";
 import type { BrowserAgentResult } from "../types";
 
 const browserLog = createLogger({ agent: "BrowserAgent" });
 const scraperLog = createLogger({ agent: "ScraperAgent" });
 const embeddingLog = createLogger({ agent: "EmbeddingAgent" });
+const retrievalLog = createLogger({ agent: "RetrievalAgent" });
 
 const ResearchPipelineState = Annotation.Root({
   targetUrl: Annotation<string>({ reducer: (_, next) => next, default: () => "" }),
   runId: Annotation<string>({ reducer: (_, next) => next, default: () => "" }),
+  query: Annotation<string>({ reducer: (_, next) => next, default: () => "" }),
   browserResult: Annotation<BrowserAgentResult | null>({ reducer: (_, next) => next, default: () => null }),
   scrapedContent: Annotation<ScrapedContent | null>({ reducer: (_, next) => next, default: () => null }),
   chunksUpserted: Annotation<number>({ reducer: (_, next) => next, default: () => 0 }),
+  retrievedContext: Annotation<BuiltContext | null>({ reducer: (_, next) => next, default: () => null }),
 });
 
 async function browserNode(state: typeof ResearchPipelineState.State) {
@@ -33,18 +38,14 @@ async function browserNode(state: typeof ResearchPipelineState.State) {
 }
 
 async function scraperNode(state: typeof ResearchPipelineState.State) {
-  if (!state.browserResult) {
-    throw new Error("Scraper node reached with no browser result — pipeline ordering bug");
-  }
+  if (!state.browserResult) throw new Error("Scraper node reached with no browser result");
   scraperLog.info({ url: state.browserResult.url }, "Extracting content");
   const scrapedContent = htmlToMarkdown(state.browserResult.html, state.browserResult.url);
   return { scrapedContent };
 }
 
 async function embeddingNode(state: typeof ResearchPipelineState.State) {
-  if (!state.scrapedContent) {
-    throw new Error("Embedding node reached with no scraped content — pipeline ordering bug");
-  }
+  if (!state.scrapedContent) throw new Error("Embedding node reached with no scraped content");
   embeddingLog.info({ url: state.browserResult!.url }, "Chunking and embedding content");
 
   const chunks = chunkText(state.scrapedContent.markdown);
@@ -58,14 +59,26 @@ async function embeddingNode(state: typeof ResearchPipelineState.State) {
   return { chunksUpserted };
 }
 
+async function retrievalNode(state: typeof ResearchPipelineState.State) {
+  if (!state.query) throw new Error("Retrieval node reached with no query");
+  retrievalLog.info({ query: state.query, runId: state.runId }, "Retrieving relevant context");
+
+  const chunks = await semanticSearch(state.query, state.runId, 10);
+  const retrievedContext = buildContext(chunks);
+
+  return { retrievedContext };
+}
+
 export function buildResearchPipelineGraph() {
   return new StateGraph(ResearchPipelineState)
     .addNode("browserNode", browserNode)
     .addNode("scraperNode", scraperNode)
     .addNode("embeddingNode", embeddingNode)
+    .addNode("retrievalNode", retrievalNode)
     .addEdge("__start__", "browserNode")
     .addEdge("browserNode", "scraperNode")
     .addEdge("scraperNode", "embeddingNode")
-    .addEdge("embeddingNode", "__end__")
+    .addEdge("embeddingNode", "retrievalNode")
+    .addEdge("retrievalNode", "__end__")
     .compile({ checkpointer });
 }

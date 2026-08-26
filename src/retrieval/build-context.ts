@@ -9,11 +9,11 @@ export interface BuiltContext {
  * Formats retrieved chunks into a single LLM-ready context block, with
  * clear per-source delimiters and a numbered source reference the LLM
  * can cite back to (e.g. "[Source 2]") — reducing the chance an LLM
- * blends or misattributes information between sources.
+ * mixes information between sources.
  */
 export function buildContext(chunks: RetrievedChunk[]): BuiltContext {
-  // De-duplicate sources while preserving first-seen order, since multiple
-  // chunks often come from the same URL.
+  // De-duplicate sources while keeping first-seen order, since multiple
+  // chunks often come from the same URL
   const seenUrls = new Map<string, number>(); // url -> source number
   const sources: Array<{ url: string; title: string }> = [];
 

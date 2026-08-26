@@ -8,7 +8,7 @@ describe("Research pipeline: Browser Agent -> Scraper Agent", () => {
     const threadId = `pipeline-thread-${randomUUID()}`;
 
     const result = await graph.invoke(
-      { targetUrl: "https://example.com" },
+      { targetUrl: "https://example.com", runId: randomUUID(), query: "test query" },
       { configurable: { thread_id: threadId } }
     );
 
@@ -24,8 +24,8 @@ describe("Research pipeline: Browser Agent -> Scraper Agent", () => {
     const graph = buildResearchPipelineGraph();
     const threadId = `pipeline-thread-${randomUUID()}`;
 
-    await graph.invoke(
-      { targetUrl: "https://example.com" },
+    const result = await graph.invoke(
+      { targetUrl: "https://example.com", runId: randomUUID(), query: "test query" },
       { configurable: { thread_id: threadId } }
     );
 
