@@ -2,7 +2,7 @@
 
 ## Change Pinecone Index Dimension
 
-Delete the existing index, then run `client.test.ts` (`./src/db/pinecone/client.test.ts`):
+Delete the existing index (using the command below), then run `client.test.ts` (`./src/db/pinecone/client.test.ts`):
 
 ```bash
 npx tsx -e "import { pinecone } from './src/db/pinecone/client'; import { env } from './src/config/env'; (async () => { await pinecone.deleteIndex(env.PINECONE_INDEX_NAME); console.log('Deleted old index:', env.PINECONE_INDEX_NAME); })();"
