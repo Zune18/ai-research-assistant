@@ -9,6 +9,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().url().min(1, "REDIS_URL is required"),
   PINECONE_API_KEY: z.string().min(1, "PINECONE_API_KEY is required"),
   PINECONE_INDEX_NAME: z.string().min(1).default("research-platform"),
+  EMBEDDING_DIMENSION: z.coerce.number().int().positive().default(1024),
 });
 
 export type Env = z.infer<typeof envSchema>;

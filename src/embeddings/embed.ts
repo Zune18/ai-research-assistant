@@ -4,16 +4,30 @@ import { createLogger } from "../utils/logger";
 
 const log = createLogger({ agent: "EmbeddingAgent" });
 
-const EMBEDDING_MODEL = "nvidia/llama-nemotron-embed-vl-1b-v2:free";
-export const EMBEDDING_DIMENSION = 2048;
+const EMBEDDING_MODEL = "liquid/lfm-2.5-embedding-350m:free";
+export const EMBEDDING_DIMENSION = env.EMBEDDING_DIMENSION;
 
 export async function embedText(text: string): Promise<number[]> {
+  // const response = await axios.post(
+  //   "https://openrouter.ai/api/v1/embeddings",
+  //   { model: EMBEDDING_MODEL, input: text },
+  //   {
+  //     headers: {
+  //       Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+  //       "Content-Type": "application/json",
+  //     },
+  //   }
+  // );
+
+  // Using local embedding service
   const response = await axios.post(
-    "https://openrouter.ai/api/v1/embeddings",
-    { model: EMBEDDING_MODEL, input: text },
+    "http://127.0.0.1:8081/v1/embeddings",
+    {
+      model: "Qwen3-Embedding-0.6B",
+      input: text,
+    },
     {
       headers: {
-        Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
       },
     }

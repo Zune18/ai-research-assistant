@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { embedText, EMBEDDING_DIMENSION } from "./embed";
 
-describe("embedText via OpenRouter (nemotron-3-embed-1b:free)", () => {
+describe("embedText via OpenRouter/Local", () => {
   it("returns a vector of the expected dimension", async () => {
     const vector = await embedText("The quick brown fox jumps over the lazy dog.");
 

@@ -1,1 +1,0 @@
-npx tsx -e "import { pinecone } from './src/db/pinecone/client'; import { env } from './src/config/env'; (async () => { await pinecone.deleteIndex(env.PINECONE_INDEX_NAME); console.log('Deleted old index:', env.PINECONE_INDEX_NAME); })();"
