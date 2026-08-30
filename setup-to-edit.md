@@ -82,3 +82,6 @@ const response = await axios.post(
   }
 );
 ```
+
+NEED TO RUN POSTGRES DB MIGRATIONS
+(SEE PART 2.1)
