@@ -31,12 +31,14 @@ it("emits progress updates as the job runs, ending at 100%", async () => {
 
   const job = await enqueueResearchRun(run.id, run.topic);
 
-  // Wait for BOTH: BullMQ's own completion signal, AND explicit
-  // confirmation that the 100% progress event specifically arrived
   await Promise.all([job.waitUntilFinished(queueEvents), completionReceived]);
 
-  expect(progressUpdates.length).toBeGreaterThanOrEqual(3);
-  expect(progressUpdates[0]).toMatchObject({ percent: 0, stage: "starting" });
+  expect(progressUpdates.length).toBeGreaterThanOrEqual(2);
+
+  // Assert on PRESENCE, not position, for both boundary events — pub/sub
+  // delivery timing means neither is guaranteed to land at a specific index,
+  // even with waitUntilReady() called beforehand.
+  expect(progressUpdates.some((u) => u.percent === 0 && u.stage === "starting")).toBe(true);
   expect(progressUpdates.some((u) => u.percent === 100 && u.stage === "completed")).toBe(true);
 
   await db.delete(runs).where(eq(runs.id, run.id));

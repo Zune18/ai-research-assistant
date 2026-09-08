@@ -92,3 +92,26 @@ export function buildResearchPipelineGraph() {
     .addEdge("contextNode", "__end__")
     .compile({ checkpointer });
 }
+
+/**
+ * Uncompiled version of the same graph, for using as a subgraph inside
+ * a larger orchestrating graph. The parent graph provides its own
+ * checkpointer at its own .compile() call — subgraphs dont it.
+ */
+export function buildResearchPipelineSubgraph() {
+  return new StateGraph(ResearchPipelineState)
+    .addNode("browserNode", browserNode)
+    .addNode("scraperNode", scraperNode)
+    .addNode("embeddingNode", embeddingNode)
+    .addNode("retrievalNode", retrievalNode)
+    .addNode("contextNode", contextNode)
+    .addEdge("__start__", "browserNode")
+    .addEdge("browserNode", "scraperNode")
+    .addEdge("scraperNode", "embeddingNode")
+    .addEdge("embeddingNode", "retrievalNode")
+    .addEdge("retrievalNode", "contextNode")
+    .addEdge("contextNode", "__end__")
+    .compile(); // no checkpointer — gets from parent when used as a subgraph
+}
+
+export { ResearchPipelineState };
