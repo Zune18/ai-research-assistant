@@ -1,8 +1,11 @@
 import { StateGraph, Annotation } from "@langchain/langgraph";
 import { checkpointer } from "./checkpointer";
 import { buildResearchPipelineSubgraph, ResearchPipelineState } from "./research-pipeline";
-import { createLogger } from "../utils/logger";
 import { reflect } from "../reflection/reflect";
+import { writeReport, GeneratedReport } from "../report/write-report";
+import { renderReportHtml } from "../report/render-html";
+import { renderReportPdf } from "../report/render-pdf";
+import { createLogger } from "../utils/logger";
 
 const log = createLogger({ component: "HandoffSupervisor" });
 
@@ -12,8 +15,6 @@ const HandoffState = Annotation.Root({
   candidateUrls: Annotation<string[]>({ reducer: (_, next) => next, default: () => [] }),
   runId: Annotation<string>({ reducer: (_, next) => next, default: () => "" }),
   researchQuery: Annotation<string>({ reducer: (_, next) => next, default: () => "" }),
-  minChunksNeeded: Annotation<number>({ reducer: (_, next) => next, default: () => 5 }),
-  totalChunksFound: Annotation<number>({ reducer: (_, next) => next, default: () => 0 }),
   iterationCount: Annotation<number>({ reducer: (_, next) => next, default: () => 0 }),
   summaries: Annotation<string[]>({ reducer: (prev, next) => [...prev, ...next], default: () => [] }),
   latestContext: Annotation<{ contextText: string; sources: Array<{ url: string; title: string }> } | null>({
@@ -21,15 +22,14 @@ const HandoffState = Annotation.Root({
     default: () => null,
   }),
   isEnough: Annotation<boolean>({ reducer: (_, next) => next, default: () => false }),
+  report: Annotation<GeneratedReport | null>({ reducer: (_, next) => next, default: () => null }),
+  reportHtmlPath: Annotation<string | null>({ reducer: (_, next) => next, default: () => null }),
+  reportPdfPath: Annotation<string | null>({ reducer: (_, next) => next, default: () => null }),
 });
 
 const subgraph = buildResearchPipelineSubgraph();
 
-/**
- * Hands off to the next agent in line: takes the next unprocessed URL,
- * runs it through the full research subgraph, and adds its chunk count
- * to the running total.
- */
+// Hands off to the next agent in line
 async function processNextCandidate(state: typeof HandoffState.State) {
   const url = state.candidateUrls[state.iterationCount];
   log.info({ url, iteration: state.iterationCount }, "Handing off to research subgraph");
@@ -45,7 +45,7 @@ async function processNextCandidate(state: typeof HandoffState.State) {
 
   return {
     summaries: [summary],
-    totalChunksFound: state.totalChunksFound + chunkCount,
+    latestContext: result.retrievedContext,
     iterationCount: state.iterationCount + 1,
   };
 }
@@ -54,41 +54,56 @@ async function reflectOnProgress(state: typeof HandoffState.State) {
   if (!state.latestContext) {
     return { isEnough: false };
   }
-
   const result = await reflect(state.researchQuery, state.latestContext);
   log.info({ isEnough: result.isEnough, gaps: result.gaps }, "Reflection result");
-
   return { isEnough: result.isEnough };
 }
 
 /**
- * The Planner's decision: do we have enough chunks yet? If not, and we still
- * have candidate URLs left, and we haven't hit the hard cap — hand off to
- * another round. Otherwise, stop.
+ * Writes the final report, then renders it as both HTML and PDF files.
+ * Runs once, right before the graph ends.
  */
-function planNextStep(state: typeof HandoffState.State): "processNextCandidate" | "__end__" {
-  if (state.totalChunksFound >= state.minChunksNeeded) {
-    log.info({ totalChunksFound: state.totalChunksFound }, "Enough chunks found, stopping");
-    return "__end__";
+async function writeFinalReport(state: typeof HandoffState.State) {
+  if (!state.latestContext) {
+    log.warn("No context gathered — skipping report generation");
+    return { report: null };
   }
-  if (state.iterationCount >= MAX_ITERATIONS) {
-    log.warn({ iterationCount: state.iterationCount }, "Hit max iterations, stopping anyway");
-    return "__end__";
-  }
-  if (state.iterationCount >= state.candidateUrls.length) {
-    log.info("No more candidate URLs left, stopping");
-    return "__end__";
-  }
-  return "processNextCandidate";
+
+  const report = await writeReport(state.researchQuery, state.latestContext);
+  const html = await renderReportHtml(report);
+
+  const safeFilename = `report-${Date.now()}`;
+  const htmlPath = `tmp/reports/${safeFilename}.html`;
+  const fs = await import("node:fs/promises");
+  await fs.mkdir("tmp/reports", { recursive: true });
+  await fs.writeFile(htmlPath, html);
+
+  const pdfPath = await renderReportPdf(html, `${safeFilename}.pdf`);
+
+  return { report, reportHtmlPath: htmlPath, reportPdfPath: pdfPath };
 }
 
-function routeAfterReflection(state: typeof HandoffState.State): "processNextCandidate" | "__end__" {
+function planNextStep(
+  state: typeof HandoffState.State
+): "processNextCandidate" | "reflectOnProgress" | "writeFinalReport" {
+  if (state.iterationCount >= MAX_ITERATIONS || state.iterationCount >= state.candidateUrls.length) {
+    return "writeFinalReport";
+  }
+  if (state.latestContext === null) {
+    return "processNextCandidate";
+  }
+  return "reflectOnProgress";
+}
+
+function routeAfterReflection(
+  state: typeof HandoffState.State
+): "processNextCandidate" | "writeFinalReport" {
   if (state.isEnough) {
-    log.info("Reflection says we have enough, stopping");
-    return "__end__";
+    log.info("Reflection says we have enough, moving to report");
+    return "writeFinalReport";
   }
   if (state.iterationCount >= MAX_ITERATIONS || state.iterationCount >= state.candidateUrls.length) {
-    return "__end__";
+    return "writeFinalReport";
   }
   return "processNextCandidate";
 }
@@ -97,8 +112,10 @@ export function buildHandoffSupervisorGraph() {
   return new StateGraph(HandoffState)
     .addNode("processNextCandidate", processNextCandidate)
     .addNode("reflectOnProgress", reflectOnProgress)
+    .addNode("writeFinalReport", writeFinalReport)
     .addConditionalEdges("__start__", planNextStep)
     .addConditionalEdges("processNextCandidate", planNextStep)
     .addConditionalEdges("reflectOnProgress", routeAfterReflection)
+    .addEdge("writeFinalReport", "__end__")
     .compile({ checkpointer });
 }
