@@ -3,47 +3,77 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import { buildHandoffSupervisorGraph } from "./handoff-supervisor";
 
-describe("Handoff supervisor with reflection and report generation", () => {
-  it("stops early when reflection judges the research is enough, and writes a report", async () => {
-    const graph = buildHandoffSupervisorGraph();
-    const threadId = `handoff-reflect-thread-${randomUUID()}`;
-    const runId = randomUUID();
+function newConfig() {
+  return { configurable: { thread_id: `handoff-thread-${randomUUID()}` } };
+}
 
-    const result = await graph.invoke(
+describe("Handoff supervisor with human approval", () => {
+  it("pauses before processing any URL", async () => {
+    const graph = buildHandoffSupervisorGraph();
+    const config = newConfig();
+
+    const paused = await graph.invoke(
       {
-        candidateUrls: ["https://example.com", "https://example.org", "https://example.net"],
-        runId,
+        candidateUrls: ["https://example.com", "https://example.org"],
+        runId: randomUUID(),
         researchQuery: "What is this domain used for?",
       },
-      { configurable: { thread_id: threadId } }
+      config
     );
 
-    expect(result.iterationCount).toBeLessThanOrEqual(3);
-    expect(result.report).not.toBeNull();
-    expect(result.reportHtmlPath).not.toBeNull();
-    expect(result.reportPdfPath).not.toBeNull();
+    expect(paused.iterationCount).toBe(0);
+    expect(paused.summaries).toEqual([]);
+    expect(paused.report).toBeNull();
 
-    const htmlStat = await fs.stat(result.reportHtmlPath!);
-    const pdfStat = await fs.stat(result.reportPdfPath!);
+    const state = await graph.getState(config);
+    expect(state.next).toEqual(["reviewPlan"]);
+  }, 15000);
+
+  it("uses the edited URL list after a person changes it during the pause", async () => {
+    const graph = buildHandoffSupervisorGraph();
+    const config = newConfig();
+
+    await graph.invoke(
+      {
+        candidateUrls: ["https://example.com", "https://example.org"],
+        runId: randomUUID(),
+        researchQuery: "What is this domain used for?",
+      },
+      config
+    );
+
+    // The person removes example.org while the graph is paused.
+    await graph.updateState(config, { candidateUrls: ["https://example.com"] });
+
+    const resumed = await graph.invoke(null, config);
+
+    expect(resumed.summaries.length).toBeGreaterThan(0);
+    expect(resumed.summaries.every((s) => s.includes("example.com"))).toBe(true);
+    expect(resumed.summaries.some((s) => s.includes("example.org"))).toBe(false);
+  }, 150000);
+
+  it("runs the full pipeline and writes a report when approved without changes", async () => {
+    const graph = buildHandoffSupervisorGraph();
+    const config = newConfig();
+
+    await graph.invoke(
+      {
+        candidateUrls: ["https://example.com", "https://example.org", "https://example.net"],
+        runId: randomUUID(),
+        researchQuery: "What is this domain used for?",
+      },
+      config
+    );
+
+    const resumed = await graph.invoke(null, config);
+
+    expect(resumed.iterationCount).toBeGreaterThanOrEqual(1);
+    expect(resumed.iterationCount).toBeLessThanOrEqual(3);
+    expect(resumed.report).not.toBeNull();
+
+    const htmlStat = await fs.stat(resumed.reportHtmlPath!);
+    const pdfStat = await fs.stat(resumed.reportPdfPath!);
     expect(htmlStat.size).toBeGreaterThan(0);
     expect(pdfStat.size).toBeGreaterThan(0);
   }, 150000);
-
-  it("still writes a report when it stops due to running out of URLs", async () => {
-    const graph = buildHandoffSupervisorGraph();
-    const threadId = `handoff-cap-thread-${randomUUID()}`;
-    const runId = randomUUID();
-
-    const result = await graph.invoke(
-      {
-        candidateUrls: ["https://example.com"],
-        runId,
-        researchQuery: "test query",
-      },
-      { configurable: { thread_id: threadId } }
-    );
-
-    expect(result.iterationCount).toBe(1);
-    expect(result.report).not.toBeNull();
-  }, 90000);
 });

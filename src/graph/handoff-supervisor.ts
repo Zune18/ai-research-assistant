@@ -108,14 +108,29 @@ function routeAfterReflection(
   return "processNextCandidate";
 }
 
+/**
+ * A pause point. It does no work.
+ * The graph stops right before this node (see interruptBefore below),
+ * so a person can review or edit candidateUrls before anything is processed.
+ */
+async function reviewPlan() {
+  log.info("Plan approved, continuing");
+  return {};
+}
+
 export function buildHandoffSupervisorGraph() {
   return new StateGraph(HandoffState)
+    .addNode("reviewPlan", reviewPlan)
     .addNode("processNextCandidate", processNextCandidate)
     .addNode("reflectOnProgress", reflectOnProgress)
     .addNode("writeFinalReport", writeFinalReport)
-    .addConditionalEdges("__start__", planNextStep)
+    .addEdge("__start__", "reviewPlan")
+    .addConditionalEdges("reviewPlan", planNextStep)
     .addConditionalEdges("processNextCandidate", planNextStep)
     .addConditionalEdges("reflectOnProgress", routeAfterReflection)
     .addEdge("writeFinalReport", "__end__")
-    .compile({ checkpointer });
+    .compile({
+      checkpointer,
+      interruptBefore: ["reviewPlan"],
+    });
 }

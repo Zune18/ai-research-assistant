@@ -3,6 +3,7 @@
 ## Change Pinecone Index Dimension
 
 Delete the existing index (using the command below), then run `client.test.ts` (`./src/db/pinecone/client.test.ts`):
+(Delete and recreate if namespace limit issue occurs)
 
 ```bash
 npx tsx -e "import { pinecone } from './src/db/pinecone/client'; import { env } from './src/config/env'; (async () => { await pinecone.deleteIndex(env.PINECONE_INDEX_NAME); console.log('Deleted old index:', env.PINECONE_INDEX_NAME); })();"
@@ -85,3 +86,15 @@ const response = await axios.post(
 
 NEED TO RUN POSTGRES DB MIGRATIONS
 (SEE PART 2.1)
+
+Local LLM Setup
+.\llama-server.exe `
+   -hf ggml-org/Qwen3-4B-GGUF:Q4_K_M `
+   --host 127.0.0.1 `
+   --port 8082 `
+   --ctx-size 4096 `
+   --n-gpu-layers 36 `
+   --threads 6 `
+   --parallel 1
+
+llama-cpp-cuda: https://github.com/ggml-org/llama.cpp/releases?utm_source=chatgpt.com
